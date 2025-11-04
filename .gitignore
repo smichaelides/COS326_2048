@@ -1,0 +1,28 @@
+# Dune
+_build/
+*.install
+
+# OCaml
+*.cmo
+*.cmi
+*.cmx
+*.cma
+*.cmxa
+*.cmxs
+*.o
+*.a
+*.so
+*.byte
+*.native
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# VS Code
+.vscode/
+
+# Merlin
+.merlin
+

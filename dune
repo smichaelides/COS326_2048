@@ -1,0 +1,5 @@
+(library
+ (public_name cos326_2048)
+ (name cos326_2048)
+ (libraries))
+
