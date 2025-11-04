@@ -81,13 +81,23 @@ let move_up (b : board) : board =
 let move_down (b : board) : board =
   b |> transpose |> map reverse_row |> move_left |> map reverse_row |> transpose
 
-(* one core move function that handles all 4 directions *)
+(* more board in all directions *)
 let move_board board direction =
     match direction with
     | UP -> move_up board
     | DOWN -> move_down board
     | LEFT -> move_left board
     | RIGHT -> move_right board
+
+(* convert a char to a direction option *)
+let direction_of_char = function
+  | 'w' -> Some UP
+  | 's' -> Some DOWN
+  | 'a' -> Some LEFT
+  | 'd' -> Some RIGHT
+  | _ -> None
+
+(* ------------RUNNING THE GAME------------ *)
 
 (* print board ASCII helper *)
 let print_board (b : board) =
@@ -99,14 +109,6 @@ let print_board (b : board) =
     print_newline ()
   ) b;
   print_newline ()
-
-(* convert a char to a direction option *)
-let direction_of_char = function
-  | 'w' -> Some UP
-  | 's' -> Some DOWN
-  | 'a' -> Some LEFT
-  | 'd' -> Some RIGHT
-  | _ -> None
 
 (* game loop that keeps updating the board *)
 let rec game_loop (b : board) =
