@@ -97,6 +97,42 @@ let direction_of_char = function
   | 'd' -> Some RIGHT
   | _ -> None
 
+let generate_new_number (b : board) : board =
+  let n = length b in
+  let empty_cells = 
+    List.concat 
+      (list_init n (fun i -> 
+        list_init n (fun j -> (i, j))))
+    |> filter (fun (i, j) -> b.(i).(j) = 0) in
+  if empty_cells = [] then b
+  else
+    let (i, j) = List.nth empty_cells (Random.int (List.length empty_cells)) in
+    b.(i).(j) <- if Random.int 100 < 90 then 2 else 4;
+    b
+
+(* create a new board with (2 2s or 4s) following 2048 probabilities *)
+let create_new_board () : board =
+  let n = 4 in
+  let all_positions = 
+    List.concat 
+      (list_init n (fun i -> 
+        list_init n (fun j -> (i, j)))) in
+
+  (* randomly select 2 different positions *)
+  let shuffled = List.sort (fun _ _ -> Random.int 3 - 1) all_positions in
+  let pos1 = List.nth shuffled 0 in
+  let pos2 = List.nth shuffled 1 in
+  (* pre determiend probabilities of 2 and 4 *)
+  let value1 = if Random.int 100 < 90 then 2 else 4 in
+  let value2 = if Random.int 100 < 90 then 2 else 4 in
+  let (i1, j1) = pos1 in
+  let (i2, j2) = pos2 in
+  init n (fun i ->
+    init n (fun j ->
+      if (i, j) = (i1, j1) then value1
+      else if (i, j) = (i2, j2) then value2
+      else 0))
+
 (* ------------RUNNING THE GAME------------ *)
 
 (* print board ASCII helper *)
@@ -121,8 +157,16 @@ let rec game_loop (b : board) =
       match direction_of_char c.[0] with
       | Some dir ->
           let new_board = move_board b dir in
-          game_loop new_board
+          if new_board = b then game_loop new_board
+          else let new_board_val = generate_new_number new_board in
+            game_loop new_board_val
       | None ->
           print_endline "Invalid key — use WASD or q!";
           game_loop b
     )
+
+(* start a new game with a fresh board *)
+let start_game () =
+  Random.self_init ();
+  let initial_board = create_new_board () in
+  game_loop initial_board
