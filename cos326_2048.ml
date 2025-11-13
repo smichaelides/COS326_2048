@@ -7,9 +7,17 @@
 *)
 
 type direction = UP | DOWN | LEFT | RIGHT
+type status = PLAYING | WON | LOST
 
 (* 4x4 board of ints; 0 means empty *)
 type board = int array array
+
+type game_state = {
+  board: board;
+  score: int;
+  status: status;
+}
+
 
 (* helper functions for array manipulation *)
 let length arr = Array.length arr
@@ -33,13 +41,16 @@ let compress_row (row: int array) : int list =
 
 (* merge adjacent alike numbers (ONCE) and doubel them *)
 (* ie. [2; 2; 2] -> [4; 2] *)
-let merge (row: int list) : int list =
-    let rec aux row acc = 
+(* Returns (merged list, won flag) where won is true if two 516 tiles merged *)
+let merge (row: int list) : (int list * bool) =
+    let rec aux row acc won = 
     match row with 
-    | x :: y :: rest when x = y -> aux rest (2 * x :: acc)
-    | x :: rest -> aux rest (x :: acc)
-    | [] -> list_rev acc
-    in aux row []
+    | x :: y :: rest when x = y -> 
+      let new_won = won || (x = 516) in
+      aux rest (2 * x :: acc) new_won
+    | x :: rest -> aux rest (x :: acc) won
+    | [] -> (list_rev acc, won)
+    in aux row [] false
 
 (* fill padding with 0s to the end of the list *)
 let fill_padding (row: int list) : int list = 
@@ -59,29 +70,41 @@ let transpose (b : board) : board =
     init n (fun j -> b.(j).(i)))
 
 (* move left on a single row *)
-let move_left_row (row : int array) : int array =
+(* Returns (new row, won flag) *)
+let move_left_row (row : int array) : (int array * bool) =
     let nonzeros = compress_row row in
-    let merged = merge nonzeros in
+    let (merged, won) = merge nonzeros in
     let padded = fill_padding merged in
-    of_list padded
+    (of_list padded, won)
 
 (* move left on entire board *)
-let move_left (b : board) : board =
-    map move_left_row b
+(* Returns (new board, won flag) *)
+let move_left (b : board) : (board * bool) =
+    let rows_and_won = Array.map move_left_row b in
+    let new_board = Array.map fst rows_and_won in
+    let won = Array.exists snd rows_and_won in
+    (new_board, won)
 
 (* move right: reverse rows, move left, reverse back *)
-let move_right (b : board) : board =
-  b |> map reverse_row |> move_left |> map reverse_row
+(* Returns (new board, won flag) *)
+let move_right (b : board) : (board * bool) =
+  let (moved, won) = move_left (map reverse_row b) in
+  (map reverse_row moved, won)
 
 (* move up: transpose, move left, transpose back *)
-let move_up (b : board) : board =
-  b |> transpose |> move_left |> transpose
+(* Returns (new board, won flag) *)
+let move_up (b : board) : (board * bool) =
+  let (moved, won) = move_left (transpose b) in
+  (transpose moved, won)
 
 (* move down: transpose, reverse rows, move left, reverse back, transpose back *)
-let move_down (b : board) : board =
-  b |> transpose |> map reverse_row |> move_left |> map reverse_row |> transpose
+(* Returns (new board, won flag) *)
+let move_down (b : board) : (board * bool) =
+  let (moved, won) = move_left (map reverse_row (transpose b)) in
+  (transpose (map reverse_row moved), won)
 
-(* more board in all directions *)
+(* move board in all directions *)
+(* Returns (new board, won flag) *)
 let move_board board direction =
     match direction with
     | UP -> move_up board
@@ -109,6 +132,35 @@ let generate_new_number (b : board) : board =
     let (i, j) = List.nth empty_cells (Random.int (List.length empty_cells)) in
     b.(i).(j) <- if Random.int 100 < 90 then 2 else 4;
     b
+
+(* check if there are any empty cells *)
+let has_empty_cells (b : board) : bool =
+  Array.exists (fun row -> Array.exists (fun x -> x = 0) row) b
+
+(* check if any adjacent cells can merge *)
+let can_merge_adjacent (b : board) : bool =
+  let n = length b in
+  let rec check_horizontal i j =
+    if j >= n - 1 then
+      if i >= n - 1 then false
+      else check_horizontal (i + 1) 0
+    else
+      if b.(i).(j) = b.(i).(j + 1) && b.(i).(j) <> 0 then true
+      else check_horizontal i (j + 1)
+  in
+  let rec check_vertical i j =
+    if i >= n - 1 then
+      if j >= n - 1 then false
+      else check_vertical 0 (j + 1)
+    else
+      if b.(i).(j) = b.(i + 1).(j) && b.(i).(j) <> 0 then true
+      else check_vertical (i + 1) j
+  in
+  check_horizontal 0 0 || check_vertical 0 0
+
+(* check if game is over (no moves possible) *)
+let is_game_over (b : board) : bool =
+  not (has_empty_cells b) && not (can_merge_adjacent b)
 
 (* create a new board with (2 2s or 4s) following 2048 probabilities *)
 let create_new_board () : board =
@@ -149,21 +201,40 @@ let print_board (b : board) =
 (* game loop that keeps updating the board *)
 let rec game_loop (b : board) =
   print_board b;
-  print_endline "Move with WASD (or q to quit):";
-  let c = read_line () in
-  match c with
-  | "q" -> print_endline "Thanks for playing!"; ()
-  | _ -> (
-      match direction_of_char c.[0] with
-      | Some dir ->
-          let new_board = move_board b dir in
-          if new_board = b then game_loop new_board
-          else let new_board_val = generate_new_number new_board in
-            game_loop new_board_val
-      | None ->
-          print_endline "Invalid key — use WASD or q!";
-          game_loop b
-    )
+  
+  (* Check if game is over *)
+  if is_game_over b then (
+    print_endline "Game Over! No more moves possible.";
+    let c = read_line () in
+    match c with
+    | "r" | "R" -> 
+        let new_board = create_new_board () in
+        game_loop new_board
+    | "q" | "Q" -> print_endline "Thanks for playing!"; ()
+    | _ -> game_loop b
+  ) else (
+    print_endline "Move with WASD (or q to quit, r to restart):";
+    let c = read_line () in
+    match c with
+    | "q" -> print_endline "Thanks for playing!"; ()
+    | "r" | "R" -> 
+        let new_board = create_new_board () in
+        game_loop new_board
+    | _ -> (
+        match direction_of_char c.[0] with
+        | Some dir ->
+            let (new_board, won) = move_board b dir in
+            if new_board = b then game_loop new_board
+            else (
+              if won then print_endline "You win!";
+              let new_board_val = generate_new_number new_board in
+              game_loop new_board_val
+            )
+        | None ->
+            print_endline "Invalid key — use WASD, r to restart, or q to quit!";
+            game_loop b
+      )
+  )
 
 (* start a new game with a fresh board *)
 let start_game () =

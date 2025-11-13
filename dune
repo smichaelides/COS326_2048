@@ -1,5 +1,12 @@
 (library
  (public_name cos326_2048)
  (name cos326_2048)
- (libraries))
+ (libraries)
+ (modules cos326_2048))
+
+(executable
+ (name graphics_2048)
+ (public_name cos326_2048_graphics)
+ (libraries cos326_2048 graphics)
+ (modules graphics_2048))
 
